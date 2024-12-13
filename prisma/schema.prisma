@@ -12,3 +12,51 @@ datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
 }
+
+model Thread {
+  id Int @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  updateAt DateTime @updatedAt
+  content String
+  author User @relation(fields:[authorId], references: [id])
+  authorId Int
+  isDeleted Int @default(0)
+  like Like[]
+}
+
+model User {
+  id Int @id @default(autoincrement())
+  email String @unique
+  username String @unique
+  fullname String?
+  password String
+  threads Thread[]
+  followers Follow[] @relation("UserFollowers")
+  following Follow[] @relation("UserFollowings")
+}
+
+model Follow {
+  id Int @id @default(autoincrement())
+  followingId Int
+  followerId Int
+
+  isDeleted Int @default(0)
+  createdAt DateTime @default(now())
+  deletedAt DateTime?
+
+  follower User @relation("UserFollowers", fields: [followerId], references: [id])
+  following User @relation("UserFollowings", fields: [followingId], references: [id])
+   
+  
+  @@unique([followerId, followingId],  map: "followerId_followingId")
+}
+
+model Like{
+  id Int @id @default(autoincrement())
+  userId Int
+  threadId Int         
+  thread Thread @relation(fields: [threadId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([threadId])
+}

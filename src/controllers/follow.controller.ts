@@ -4,18 +4,17 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export async function getAllFollow(req: Request, res: Response) {
-  const allFollow = await prisma.follow.findMany();
-  res.json(allFollow);
+  try {
+    const allFollow = await prisma.follow.findMany();
+    res.status(200).json(allFollow);
+  } catch (error) {
+    res.status(500).json({ message: 'Error fetching follows', error });
+  }
 }
 
-export async function followUser(req: Request, res: Response) {
-  const { followerId, followingId } = req.body;
-
-  if (!followerId || !followingId) {
-    res
-      .status(400)
-      .json({ message: ' Both followerId and followingId are required' });
-  }
+export async function toggleFollow(req: Request, res: Response) {
+  const followerId = parseInt(req.params.id); // id user yang mau di-follow
+  const { id: followingId } = (req as any).user; // id user yang login
 
   try {
     const existingFollow = await prisma.follow.findUnique({
@@ -27,46 +26,45 @@ export async function followUser(req: Request, res: Response) {
       },
     });
 
-    if (existingFollow && existingFollow.isDeleted === 1) {
-      await prisma.follow.update({
+    if (existingFollow) {
+      await prisma.follow.delete({
         where: { id: existingFollow.id },
-        data: {
-          isDeleted: 0,
-          deletedAt: null,
-        },
       });
-
-      return res.status(200).json({ message: 'Follow relationship restored' });
-    }
-
-    if (!existingFollow) {
+    } else {
       await prisma.follow.create({
         data: {
           followerId,
           followingId,
         },
       });
-
-      return res.status(201).json({ message: 'Followed successfully.' });
     }
 
-    return res.status(200).json({ message: 'Already following.' });
+    const followersCount = await prisma.follow.count({
+      where: { followingId },
+    });
+    const followingCount = await prisma.follow.count({
+      where: { followerId: followingId },
+    });
+
+    return res.status(200).json({
+      message: existingFollow
+        ? 'Unfollowed successfully'
+        : 'Followed successfully',
+      followersCount,
+      followingCount,
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Error following user', error });
+    console.error('Error in toggleFollow:', error);
+    res.status(500).json({ message: 'Error toggling follow status', error });
   }
 }
 
-export async function unfollowUser(req: Request, res: Response) {
-  const { followerId, followingId } = req.body;
-
-  if (!followerId || !followingId) {
-    return res
-      .status(400)
-      .json({ message: 'Both followerId and followingId are required' });
-  }
+export async function checkFollowStatus(req: Request, res: Response) {
+  const followerId = parseInt(req.params.id);
+  const { id: followingId } = (req as any).user;
 
   try {
-    const existingFollow = await prisma.follow.findUnique({
+    const follow = await prisma.follow.findUnique({
       where: {
         followerId_followingId: {
           followerId,
@@ -75,22 +73,44 @@ export async function unfollowUser(req: Request, res: Response) {
       },
     });
 
-    // jika follow gaada atau sudah softdelete
-    if (!existingFollow || existingFollow.isDeleted === 1) {
-      return res.status(404).json({ message: 'Follow relationship not found' });
-    }
+    res.status(200).json({ isFollowing: !!follow });
+  } catch (error) {
+    console.error('Error in checkFollowStatus:', error);
+    res.status(500).json({ message: 'Error checking follow status', error });
+  }
+}
+export async function getFollowing(req: Request, res: Response) {
+  const userId = (req as any).user.id;
 
-    await prisma.follow.update({
-      where: { id: existingFollow!.id },
-      data: {
-        isDeleted: 1,
-        deletedAt: new Date(),
+  try {
+    const following = await prisma.follow.findMany({
+      where: { followerId: userId },
+      include: {
+        following: true, // ambil data user yang difollow
       },
     });
 
-    return res.status(200).json({ message: 'Unfollowed successfully' });
+    res.status(200).json(following);
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Error unfollowing user', error });
+    console.error('Error fetching following:', error);
+    res.status(500).json({ message: 'Error fetching following' });
+  }
+}
+
+export async function getFollowers(req: Request, res: Response) {
+  const userId = (req as any).user.id;
+
+  try {
+    const followers = await prisma.follow.findMany({
+      where: { followingId: userId },
+      include: {
+        follower: true, // ambil data user yang memfollow
+      },
+    });
+
+    res.status(200).json(followers);
+  } catch (error) {
+    console.error('Error fetching followers:', error);
+    res.status(500).json({ message: 'Error fetching followers' });
   }
 }

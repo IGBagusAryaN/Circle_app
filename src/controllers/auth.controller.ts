@@ -10,7 +10,7 @@ const SECRET_KEY =
 const SALT_ROUNDS = 10;
 
 export async function register(req: Request, res: Response) {
-  const { username, email, password } = req.body;
+  const { username, email, password, fullname } = req.body;
 
   if (!username || !email || !password) {
     return res.status(400).json({ message: 'All fields are required' });
@@ -39,7 +39,9 @@ export async function register(req: Request, res: Response) {
       },
     });
 
-    res.status(201).json({ message: 'user registered', user: newUser });
+    res
+      .status(200)
+      .json({ message: 'User successfully registered', user: newUser });
   } catch (error) {
     res.status(500).json({ message: 'Error registering user', error });
   }

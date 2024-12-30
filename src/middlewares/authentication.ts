@@ -16,21 +16,18 @@ export function authentication(
   }
 
   try {
-    // Decode token
     const decoded = jwt.verify(token, SECRET_KEY) as {
       id: number;
       username: string;
     };
 
-    // Tambahkan decoded data ke req.user
     (req as any).user = {
       id: decoded.id,
       username: decoded.username,
     };
 
-    next(); // Lanjut ke handler berikutnya
+    next();
   } catch (error) {
-    console.error('JWT verification error:', error); // Tambahkan log untuk debugging
     return res.status(403).json({ message: 'Invalid or expired token' });
   }
 }

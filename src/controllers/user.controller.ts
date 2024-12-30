@@ -4,18 +4,37 @@ import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 export async function getAllUser(req: Request, res: Response) {
-  const allUsers = await prisma.user.findMany({
-    select: {
-      id: true,
-      email: true,
-      password: true,
-      fullname: true,
-      username: true,
-      followers: true,
-      following: true,
-    },
-  });
-  res.json(allUsers);
+  try {
+    const allUsers = await prisma.user.findMany({
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        username: true,
+        profile: {
+          select: {
+            fullname: true,
+            bio: true,
+            bannerImage: true,
+            profileImage: true,
+          },
+        },
+        followers: true,
+        following: true,
+      },
+    });
+
+    const usersWithFollowCounts = allUsers.map((user) => ({
+      ...user,
+      followersCount: user.followers.length,
+      followingCount: user.following.length,
+    }));
+
+    return res.status(200).json(usersWithFollowCounts);
+  } catch (error) {
+    console.error('Error in getAllUser:', error);
+    res.status(500).json({ message: 'Error fetching users', error });
+  }
 }
 
 export async function updateUser(req: Request, res: Response) {
@@ -61,5 +80,50 @@ export async function updateUser(req: Request, res: Response) {
     res.status(500).json({ message: 'Error updating user' });
   }
 }
+export async function searchUsers(req: Request, res: Response) {
+  const { query } = req.query;
 
-export async function deleteUser(req: Request, res: Response) {}
+  try {
+    if (!query || typeof query !== 'string') {
+      return res.status(400).json({ message: 'Query parameter is required' });
+    }
+
+    const users = await prisma.user.findMany({
+      where: {
+        OR: [
+          {
+            username: {
+              contains: query,
+              mode: 'insensitive',
+            },
+          },
+          {
+            profile: {
+              some: {
+                fullname: {
+                  contains: query,
+                  mode: 'insensitive',
+                },
+              },
+            },
+          },
+        ],
+      },
+      select: {
+        id: true,
+        username: true,
+        profile: {
+          select: {
+            fullname: true,
+            profileImage: true,
+          },
+        },
+      },
+    });
+
+    res.status(200).json(users);
+  } catch (error) {
+    console.error('Error searching users:', error);
+    res.status(500).json({ message: 'Error searching users', error });
+  }
+}

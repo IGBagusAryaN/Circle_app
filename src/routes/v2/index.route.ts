@@ -8,6 +8,7 @@ import replyRouter from '../v1/reply.route';
 import path from 'path';
 import profileRoute from '../v1/profile.route';
 import suggestRouter from '../v1/suggest.route';
+import searchRoute from '../v1/search.route';
 
 const router = express();
 
@@ -19,6 +20,7 @@ router.use('/like', likeRoute);
 router.use('/reply', replyRouter);
 router.use('/profile', profileRoute);
 router.use('/suggest', suggestRouter);
+router.use('/search', searchRoute);
 // router.use('/uploads', express.static(path.join(__dirname, '../../middlewares/uploads')));
 
 export default router;

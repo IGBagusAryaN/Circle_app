@@ -4,11 +4,17 @@ const prisma = new PrismaClient();
 
 const SECRET_KEY =
   process.env.SECRET_KEY || 'adade3938eeh3huedaihoaheao83h3ra8oa3hr8a4';
+
 export async function getAllThread(req: Request, res: Response) {
   try {
-    const user = (req as any).user || null;
     const filterByUser = req.query.filterByUser === 'true';
-    const userId = parseInt(req.query.userId as string, 10);
+    const userId = req.query.userId
+      ? parseInt(req.query.userId as string, 10)
+      : null;
+
+    if (filterByUser && userId && isNaN(userId)) {
+      return res.status(400).json({ message: 'Invalid userId provided' });
+    }
 
     const threads = await prisma.thread.findMany({
       where: {
@@ -32,8 +38,10 @@ export async function getAllThread(req: Request, res: Response) {
 export async function createThread(req: Request, res: Response) {
   const { content } = req.body;
 
-  if (!content) {
-    return res.status(400).json({ message: 'Content is required' });
+  if (!content || typeof content !== 'string' || content.trim() === '') {
+    return res
+      .status(400)
+      .json({ message: 'Content must be a non-empty string' });
   }
 
   try {
@@ -48,7 +56,7 @@ export async function createThread(req: Request, res: Response) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    const profile = user.profile[0];
+    const profile = user.profile && user.profile[0];
     if (!profile) {
       return res.status(400).json({ message: 'User does not have a profile' });
     }
@@ -79,32 +87,39 @@ export async function updateThread(req: Request, res: Response) {
   const { content } = req.body;
   const file = req.file?.path;
 
+  if (!content && !file) {
+    return res.status(400).json({ message: 'Nothing to update' });
+  }
+
   try {
     const existingThread = await prisma.thread.findUnique({
-      where: { id: Number(threadId) },
+      where: { id: threadId },
     });
 
     if (!existingThread) {
       return res.status(404).json({ message: 'Thread not found' });
     }
 
-    if (existingThread.authorId !== Number((req as any).user.id)) {
+    if (existingThread.authorId !== (req as any).user.id) {
       return res
         .status(403)
         .json({ message: 'You are not authorized to update this thread' });
     }
 
-    const updateThread = await prisma.thread.update({
-      where: { id: Number(threadId) },
+    const updatedThread = await prisma.thread.update({
+      where: { id: threadId },
       data: {
-        content,
-        image: file,
+        ...(content && { content }),
+        ...(file && { image: file }),
       },
     });
 
-    res.status(200).json({ message: 'Succesfully update thread' });
+    res
+      .status(200)
+      .json({ message: 'Successfully updated thread', thread: updatedThread });
   } catch (error) {
-    res.status(500).json({ message: 'Failed update thread' });
+    console.error('Error updating thread:', error);
+    res.status(500).json({ message: 'Failed to update thread', error });
   }
 }
 
@@ -122,8 +137,8 @@ export async function deleteThread(req: Request, res: Response) {
 
     if (threadExist.authorId !== (req as any).user.id) {
       return res
-        .status(401)
-        .json({ message: 'User not granted to delete this thread' });
+        .status(403)
+        .json({ message: 'You are not authorized to delete this thread' });
     }
 
     if (threadExist.isDeleted === 1) {
@@ -131,17 +146,40 @@ export async function deleteThread(req: Request, res: Response) {
     }
 
     await prisma.thread.update({
-      where: {
-        id: threadId,
-      },
-      data: {
-        isDeleted: 1,
-      },
+      where: { id: threadId },
+      data: { isDeleted: 1 },
     });
 
-    res.status(200).json({ message: 'thread deleted succesfully' });
+    res.status(200).json({ message: 'Thread deleted successfully' });
   } catch (error) {
     console.error('Error deleting thread:', error);
     res.status(500).json({ message: 'Error deleting thread', error });
+  }
+}
+
+export async function getThreadDetail(req: Request, res: Response) {
+  const threadId = parseInt(req.params.id);
+
+  if (isNaN(threadId)) {
+    return res.status(400).json({ message: 'Invalid thread ID' });
+  }
+
+  try {
+    const thread = await prisma.thread.findUnique({
+      where: { id: threadId, isDeleted: 0 },
+      include: {
+        profile: { select: { id: true, fullname: true, profileImage: true } },
+        author: { select: { id: true, username: true } },
+      },
+    });
+
+    if (!thread) {
+      return res.status(404).json({ message: 'Thread not found' });
+    }
+
+    res.status(200).json({ message: 'Get thread detail successfully', thread });
+  } catch (error) {
+    console.error('Error fetching thread detail:', error);
+    res.status(500).json({ message: 'Error fetching thread detail', error });
   }
 }

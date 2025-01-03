@@ -54,7 +54,6 @@ export async function toggleFollow(req: Request, res: Response) {
       followingCount,
     });
   } catch (error) {
-    console.error('Error in toggleFollow:', error);
     res.status(500).json({ message: 'Error toggling follow status', error });
   }
 }
@@ -75,7 +74,6 @@ export async function checkFollowStatus(req: Request, res: Response) {
 
     res.status(200).json({ isFollowing: !!follow });
   } catch (error) {
-    console.error('Error in checkFollowStatus:', error);
     res.status(500).json({ message: 'Error checking follow status', error });
   }
 }
@@ -110,7 +108,6 @@ export async function getFollowers(req: Request, res: Response) {
 
     res.status(200).json(followers);
   } catch (error) {
-    console.error('Error fetching followers:', error);
     res.status(500).json({ message: 'Error fetching followers' });
   }
 }

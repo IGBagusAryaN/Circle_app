@@ -80,34 +80,29 @@ export async function updateUser(req: Request, res: Response) {
     res.status(500).json({ message: 'Error updating user' });
   }
 }
-export async function searchUsers(req: Request, res: Response) {
+
+export const searchUsers = async (req: Request, res: Response) => {
   const { query } = req.query;
 
-  try {
-    if (!query || typeof query !== 'string') {
-      return res.status(400).json({ message: 'Query parameter is required' });
-    }
+  // Ambil user ID dari token (contoh: `req.user` yang disetel dari middleware)
+  const userId = res.locals.userId;
 
+  if (!query || typeof query !== 'string') {
+    return res
+      .status(400)
+      .json({ message: 'Query parameter is required and must be a string' });
+  }
+
+  try {
     const users = await prisma.user.findMany({
       where: {
-        OR: [
-          {
-            username: {
-              contains: query,
-              mode: 'insensitive',
-            },
-          },
-          {
-            profile: {
-              some: {
-                fullname: {
-                  contains: query,
-                  mode: 'insensitive',
-                },
-              },
-            },
-          },
-        ],
+        username: {
+          contains: query, // Pencarian case-insensitive
+          mode: 'insensitive',
+        },
+        id: {
+          not: userId, // Filter untuk mengecualikan akun yang login
+        },
       },
       select: {
         id: true,
@@ -121,9 +116,56 @@ export async function searchUsers(req: Request, res: Response) {
       },
     });
 
-    res.status(200).json(users);
+    return res.json(users);
   } catch (error) {
-    console.error('Error searching users:', error);
-    res.status(500).json({ message: 'Error searching users', error });
+    console.error('Error fetching users:', error);
+    return res.status(500).json({ message: 'Error fetching users', error });
   }
-}
+};
+
+export const getUserById = async (req: Request, res: Response) => {
+  console.log('Params:', req.params);
+
+  const { id } = req.params;
+
+  try {
+    const userId = parseInt(id, 10);
+    console.log('User ID:', userId);
+
+    if (isNaN(userId)) {
+      console.log('User ID invalid');
+      return res.status(400).json({ message: 'Invalid user ID' });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: {
+        id: userId,
+      },
+      select: {
+        id: true,
+        email: true,
+        username: true,
+        profile: {
+          select: {
+            fullname: true,
+            bio: true,
+            bannerImage: true,
+            profileImage: true,
+          },
+        },
+        followers: true,
+        following: true,
+      },
+    });
+
+    if (!user) {
+      console.log('User not found');
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    return res.json(user);
+  } catch (error) {
+    console.error('Error fetching user:', error);
+    return res.status(500).json({ message: 'Error fetching user', error });
+  }
+};

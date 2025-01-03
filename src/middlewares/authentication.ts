@@ -26,6 +26,8 @@ export function authentication(
       username: decoded.username,
     };
 
+    res.locals.userId = decoded.id;
+
     next();
   } catch (error) {
     return res.status(403).json({ message: 'Invalid or expired token' });

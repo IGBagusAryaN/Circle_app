@@ -3,6 +3,7 @@ import {
   createThread,
   deleteThread,
   getAllThread,
+  getThreadDetail,
   updateThread,
 } from '../../controllers/thread.controller';
 import { authentication } from '../../middlewares/authentication';
@@ -11,6 +12,7 @@ import { upload } from '../../middlewares/upload-file';
 const threadRoute = express();
 
 threadRoute.get('/', getAllThread);
+threadRoute.get('/:id', authentication, getThreadDetail);
 threadRoute.put(
   '/:id',
   authentication,
